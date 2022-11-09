@@ -1,0 +1,10 @@
+install docker
+
+add user to docker group -> re-login!
+
+test docker:
+docker run hello-world
+
+run kinesis container:
+docker run -it -p 4567:4567 ruanbekker/kinesis-local:latest
+
