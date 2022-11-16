@@ -3,7 +3,7 @@
 
 data files:
 
-plans.csv - used as broadcasted dictionary
+plans.csv - used as broadcasted mapping
     product_id,"product_type","product_name"
 
 raw_data.parquet - data to process
@@ -21,30 +21,20 @@ spark-submit --executor-memory 1g mainjob.py
 
 from pyspark.sql import SparkSession
 # from pyspark import SparkConf, SparkContext
-from pyspark.sql import functions as func
-import codecs
+# from pyspark.sql import functions as func
+from pyspark.sql.functions import concat_ws, broadcast
 
 
-# load ProdID/ProdName from ext file as dict
-def loadPlanNames():
-    PlanNames = {}
-    with codecs.open("./plans.csv", "r", encoding='ISO-8859-1', errors='ignore') as f:
-        for line in f:
-            fields = line.split(',')
-            PlanNames[int(fields[0])] = fields[1].strip('\"') + ' ' + fields[2].strip().strip('\"')
-    return PlanNames
-
-
-def lookupName(productID):
-    return nameDict.value[productID]
+# load ProdID/ProdName from csv file as dataframe
+def load_plan_names():
+    csv_df = spark.read.csv('./plans.csv', header=True)
+    plan_names_df = csv_df.select("product_id", concat_ws(" ", "product_type", "product_name").alias("product"))
+    return plan_names_df
 
 
 # Main entrypoint. Start spark session
 # local:
 spark = SparkSession.builder.appName("PopulatePlanNames").getOrCreate()
-
-# Broadcast dictionary
-nameDict = spark.sparkContext.broadcast(loadPlanNames())
 
 # Load up data as dataframe
 # to load data from S3 use: s3n://bucket_name/file.ext
@@ -53,11 +43,8 @@ rawDF = spark.read.parquet("./raw_data.parquet")
 # Grab the top 10
 rawDF.show(10, False)
 
-# Create a user-defined function to look up names from broadcasted dictionary
-lookupNameUDF = func.udf(lookupName)
-
-# Add a PlanName column using new udf
-dataWithPlanNames = rawDF.withColumn("PlanName", lookupNameUDF(func.col("product_id")))
+# Add a 'product' column using broadcasted dataframe loaded from csv file
+dataWithPlanNames = rawDF.join(broadcast(load_plan_names()), "product_id")
 
 # Grab the top 10
 dataWithPlanNames.show(10, False)
