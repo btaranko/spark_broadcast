@@ -23,6 +23,18 @@ from pyspark.sql import SparkSession
 # from pyspark import SparkConf, SparkContext
 # from pyspark.sql import functions as func
 from pyspark.sql.functions import concat_ws, broadcast
+import time
+
+
+# decorator "timer". use before function definition: @timer
+def timer(f):
+    def tmp(*args, **kwargs):
+        t = time.time()
+        res = f(*args, **kwargs)
+        print("Task execution time: %f" % (time.time()-t))
+        return res
+
+    return tmp
 
 
 # load ProdID/ProdName from csv file as dataframe
@@ -32,22 +44,35 @@ def load_plan_names():
     return plan_names_df
 
 
-# Main entrypoint. Start spark session
-# local:
-spark = SparkSession.builder.appName("PopulatePlanNames").getOrCreate()
+@timer
+def broadcast_join():
+    # Add a 'product' column using broadcasted dataframe loaded from csv file
+    dataWithPlanNames = rawDF.join(broadcast(load_plan_names()), "product_id")
+    dataWithPlanNames.show(10, False)
 
-# Load up data as dataframe
-# to load data from S3 use: s3n://bucket_name/file.ext
-rawDF = spark.read.parquet("./raw_data.parquet")
 
-# Grab the top 10
-rawDF.show(10, False)
+@timer
+def broadcast_mapping():
+    plan_names_df = load_plan_names()
+    plan_names_df.show(1, False)
+    spark.sparkContext.broadcast(plan_names_df)
 
-# Add a 'product' column using broadcasted dataframe loaded from csv file
-dataWithPlanNames = rawDF.join(broadcast(load_plan_names()), "product_id")
 
-# Grab the top 10
-dataWithPlanNames.show(10, False)
 
-# Stop the session
-spark.stop()
+if __name__ == '__main__':
+    # Start spark session
+    spark = SparkSession.builder.appName("PopulatePlanNames").getOrCreate()
+
+    # Load up data as dataframe
+    rawDF = spark.read.parquet("./raw_data.parquet")
+    rawDF.show(10, False)
+
+    # First - use broadcast join
+    broadcast_join()
+
+    # Second = broadcast mapping before join
+    broadcast_mapping()
+
+
+    # Stop the session
+    spark.stop()
