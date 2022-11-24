@@ -21,7 +21,6 @@ spark-submit --executor-memory 1g mainjob.py
 
 from pyspark.sql import SparkSession
 # from pyspark import SparkConf, SparkContext
-# from pyspark.sql import functions as func
 from pyspark.sql.functions import concat_ws, broadcast
 import time
 
@@ -31,7 +30,7 @@ def timer(f):
     def tmp(*args, **kwargs):
         t = time.time()
         res = f(*args, **kwargs)
-        print("Task execution time: %f" % (time.time()-t))
+        print('Task execution time: %f' % (time.time()-t))
         return res
 
     return tmp
@@ -40,39 +39,49 @@ def timer(f):
 # load ProdID/ProdName from csv file as dataframe
 def load_plan_names():
     csv_df = spark.read.csv('./plans.csv', header=True)
-    plan_names_df = csv_df.select("product_id", concat_ws(" ", "product_type", "product_name").alias("product"))
+    plan_names_df = csv_df.select('product_id', concat_ws(' ', 'product_type', 'product_name').alias('product'))
     return plan_names_df
 
 
 @timer
 def broadcast_join():
     # Add a 'product' column using broadcasted dataframe loaded from csv file
-    dataWithPlanNames = rawDF.join(broadcast(load_plan_names()), "product_id")
-    dataWithPlanNames.show(10, False)
+    dataWithPlanNames = rawDF.join(broadcast(load_plan_names()), 'product_id')
+    dataWithPlanNames.show(5, False)
 
 
 @timer
-def broadcast_mapping():
-    plan_names_df = load_plan_names()
-    plan_names_df.show(1, False)
-    spark.sparkContext.broadcast(plan_names_df)
-
+def simple_join():
+    name_dict_df = load_plan_names()
+    dataWithPlanNames = rawDF.join(name_dict_df, 'product_id')
+    dataWithPlanNames.show(5, False)
 
 
 if __name__ == '__main__':
     # Start spark session
-    spark = SparkSession.builder.appName("PopulatePlanNames").getOrCreate()
+    spark = SparkSession.builder.appName('PopulatePlanNames').getOrCreate()
+    spark.sparkContext.setLogLevel('WARN')
 
-    # Load up data as dataframe
-    rawDF = spark.read.parquet("./raw_data.parquet")
-    rawDF.show(10, False)
+    # Check spark configuration
+    # configurations = spark.sparkContext.getConf().getAll()
+    # for item in configurations:
+    #     print(item)
+
+    # Load up data as dataframe and multiply it
+    rawDF = spark.read.parquet('./raw_data.parquet')
+    rawDF.show(5, False)
+    for i in range(0, 10):
+        rawDF = rawDF.union(rawDF)
+
+    print(f'Incoming data: {rawDF.count()} records')
 
     # First - use broadcast join
     broadcast_join()
+    print('Time for broadcast join')
 
-    # Second = broadcast mapping before join
-    broadcast_mapping()
-
+    # Second = simple join without broadcast
+    simple_join()
+    print('Time for simple join')
 
     # Stop the session
     spark.stop()
