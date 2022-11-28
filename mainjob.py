@@ -15,7 +15,7 @@ raw_data.parquet - data to process
     end_date (ISO 946681200 - 2524604400)
 
 to run on master node:
-spark-submit --executor-memory 1g mainjob.py
+spark-submit mainjob.py
 """
 
 
@@ -62,15 +62,10 @@ if __name__ == '__main__':
     spark = SparkSession.builder.appName('PopulatePlanNames').getOrCreate()
     spark.sparkContext.setLogLevel('WARN')
 
-    # Check spark configuration
-    # configurations = spark.sparkContext.getConf().getAll()
-    # for item in configurations:
-    #     print(item)
-
     # Load up data as dataframe and multiply it
     rawDF = spark.read.parquet('./raw_data.parquet')
     rawDF.show(5, False)
-    for i in range(0, 10):
+    for i in range(0, 11):
         rawDF = rawDF.union(rawDF)
 
     print(f'Incoming data: {rawDF.count()} records')
