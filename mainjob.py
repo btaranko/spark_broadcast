@@ -3,7 +3,7 @@
 
 data files:
 
-plans.csv - used as broadcasted dictionary
+plans.csv - used as broadcasted mapping
     product_id,"product_type","product_name"
 
 raw_data.parquet - data to process
@@ -15,52 +15,68 @@ raw_data.parquet - data to process
     end_date (ISO 946681200 - 2524604400)
 
 to run on master node:
-spark-submit --executor-memory 1g mainjob.py
+spark-submit mainjob.py
 """
 
 
 from pyspark.sql import SparkSession
 # from pyspark import SparkConf, SparkContext
-from pyspark.sql import functions as func
-import codecs
+from pyspark.sql.functions import concat_ws, broadcast
+import time
 
 
-# load ProdID/ProdName from ext file as dict
-def loadPlanNames():
-    PlanNames = {}
-    with codecs.open("./plans.csv", "r", encoding='ISO-8859-1', errors='ignore') as f:
-        for line in f:
-            fields = line.split(',')
-            PlanNames[int(fields[0])] = fields[1].strip('\"') + ' ' + fields[2].strip().strip('\"')
-    return PlanNames
+# decorator "timer". use before function definition: @timer
+def timer(f):
+    def tmp(*args, **kwargs):
+        t = time.time()
+        res = f(*args, **kwargs)
+        print('Task execution time: %f' % (time.time()-t))
+        return res
+
+    return tmp
 
 
-def lookupName(productID):
-    return nameDict.value[productID]
+# load ProdID/ProdName from csv file as dataframe
+def load_plan_names():
+    csv_df = spark.read.csv('./plans.csv', header=True)
+    plan_names_df = csv_df.select('product_id', concat_ws(' ', 'product_type', 'product_name').alias('product'))
+    return plan_names_df
 
 
-# Main entrypoint. Start spark session
-# local:
-spark = SparkSession.builder.appName("PopulatePlanNames").getOrCreate()
+@timer
+def broadcast_join():
+    # Add a 'product' column using broadcasted dataframe loaded from csv file
+    dataWithPlanNames = rawDF.join(broadcast(load_plan_names()), 'product_id')
+    dataWithPlanNames.show(5, False)
 
-# Broadcast dictionary
-nameDict = spark.sparkContext.broadcast(loadPlanNames())
 
-# Load up data as dataframe
-# to load data from S3 use: s3n://bucket_name/file.ext
-rawDF = spark.read.parquet("./raw_data.parquet")
+@timer
+def simple_join():
+    name_dict_df = load_plan_names()
+    dataWithPlanNames = rawDF.join(name_dict_df, 'product_id')
+    dataWithPlanNames.show(5, False)
 
-# Grab the top 10
-rawDF.show(10, False)
 
-# Create a user-defined function to look up names from broadcasted dictionary
-lookupNameUDF = func.udf(lookupName)
+if __name__ == '__main__':
+    # Start spark session
+    spark = SparkSession.builder.appName('PopulatePlanNames').getOrCreate()
+    spark.sparkContext.setLogLevel('WARN')
 
-# Add a PlanName column using new udf
-dataWithPlanNames = rawDF.withColumn("PlanName", lookupNameUDF(func.col("product_id")))
+    # Load up data as dataframe and multiply it
+    rawDF = spark.read.parquet('./raw_data.parquet')
+    rawDF.show(5, False)
+    for i in range(0, 11):
+        rawDF = rawDF.union(rawDF)
 
-# Grab the top 10
-dataWithPlanNames.show(10, False)
+    print(f'Incoming data: {rawDF.count()} records')
 
-# Stop the session
-spark.stop()
+    # First - use broadcast join
+    broadcast_join()
+    print('Time for broadcast join')
+
+    # Second = simple join without broadcast
+    simple_join()
+    print('Time for simple join')
+
+    # Stop the session
+    spark.stop()

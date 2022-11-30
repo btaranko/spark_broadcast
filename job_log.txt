@@ -1,0 +1,56 @@
+config used for job:
+2 workers:
+    worker : 1 core / 5g
+Incoming data: 1 024 000 000 records (parquet)
+Mapphing data: 999 999 records (csv)
+
+
+result:
+Time for broadcast join 71.545052s
+Time for simple join 1289.374031s
+Job duration 28min
+
+
++-----------+-----------+----------+---------------+----------+----------+-----------------+
+|employee_id|employer_id|product_id|covered_persons|start_date|end_date  |__index_level_0__|
++-----------+-----------+----------+---------------+----------+----------+-----------------+
+|0          |5          |3         |2              |1302744015|1872020715|0                |
+|1          |5          |2         |2              |1059604812|1153928794|0                |
+|2          |14         |1         |3              |1967796077|2245863400|0                |
+|3          |6          |4         |1              |1491044453|1528646899|0                |
+|4          |13         |4         |4              |2335535255|2503680572|0                |
++-----------+-----------+----------+---------------+----------+----------+-----------------+
+only showing top 5 rows
+
+22/11/28 13:55:12 WARN DAGScheduler: Broadcasting large task binary with size 1285.2 KiB
+Incoming data: 1024000000 records
+22/11/28 14:01:01 WARN DAGScheduler: Broadcasting large task binary with size 16.0 MiB
++----------+-----------+-----------+---------------+----------+----------+-----------------+------------------------+
+|product_id|employee_id|employer_id|covered_persons|start_date|end_date  |__index_level_0__|product                 |
++----------+-----------+-----------+---------------+----------+----------+-----------------+------------------------+
+|3         |0          |5          |2              |1302744015|1872020715|0                |HLT Optimal Medical Plan|
+|2         |1          |5          |2              |1059604812|1153928794|0                |HLT Light Medical Plan  |
+|1         |2          |14         |3              |1967796077|2245863400|0                |HLT Basic Medical Plan  |
+|4         |3          |6          |1              |1491044453|1528646899|0                |HLT Premium Medical Plan|
+|4         |4          |13         |4              |2335535255|2503680572|0                |HLT Premium Medical Plan|
++----------+-----------+-----------+---------------+----------+----------+-----------------+------------------------+
+only showing top 5 rows
+
+Task execution time: 71.545052
+Time for broadcast join
+22/11/28 14:01:53 WARN DAGScheduler: Broadcasting large task binary with size 16.0 MiB
+22/11/28 14:22:24 WARN DAGScheduler: Broadcasting large task binary with size 5.7 MiB
+22/11/28 14:22:26 WARN DAGScheduler: Broadcasting large task binary with size 5.7 MiB
++----------+-----------+-----------+---------------+----------+----------+-----------------+----------------------+
+|product_id|employee_id|employer_id|covered_persons|start_date|end_date  |__index_level_0__|product               |
++----------+-----------+-----------+---------------+----------+----------+-----------------+----------------------+
+|5         |7          |20         |1              |951969113 |2429899830|0                |HLT Extra Medical Plan|
+|5         |9          |17         |3              |1007254193|1151748909|0                |HLT Extra Medical Plan|
+|5         |17         |18         |2              |1167031913|2012272017|0                |HLT Extra Medical Plan|
+|5         |24         |14         |2              |2236060017|2471329527|0                |HLT Extra Medical Plan|
+|5         |28         |13         |3              |1561459205|1800765482|0                |HLT Extra Medical Plan|
++----------+-----------+-----------+---------------+----------+----------+-----------------+----------------------+
+only showing top 5 rows
+
+Task execution time: 1289.374031
+Time for simple join
