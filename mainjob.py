@@ -20,7 +20,7 @@ spark-submit mainjob.py
 
 
 from pyspark.sql import SparkSession
-# from pyspark import SparkConf, SparkContext
+from pyspark import SparkConf, SparkContext
 from pyspark.sql.functions import concat_ws, broadcast
 import time
 
@@ -58,9 +58,19 @@ def simple_join():
 
 
 if __name__ == '__main__':
-    # Start spark session
-    spark = SparkSession.builder.appName('PopulatePlanNames').getOrCreate()
+    # Configure and start spark session
+    conf = SparkConf().setAll([('spark.executor.memory', '6g'),
+                               ('spark.executor.cores', '1'),
+                               ('spark.cores.max', '2'),
+                               ('spark.driver.memory', '1g')])
+    spark = SparkSession.builder.config(conf=conf).appName("PopulatePlanNames").getOrCreate()
     spark.sparkContext.setLogLevel('WARN')
+
+    # Check spark configuration
+    print('Current spark config:')
+    configurations = spark.sparkContext.getConf().getAll()
+    for item in configurations:
+        print(item)
 
     # Load up data as dataframe and multiply it
     rawDF = spark.read.parquet('./raw_data.parquet')
