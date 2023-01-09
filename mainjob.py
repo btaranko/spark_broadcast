@@ -20,7 +20,7 @@ spark-submit mainjob.py
 
 
 from pyspark.sql import SparkSession
-from pyspark import SparkConf, SparkContext
+from pyspark import SparkConf, StorageLevel, SparkContext
 from pyspark.sql.functions import concat_ws, broadcast
 import time
 
@@ -75,9 +75,10 @@ if __name__ == '__main__':
     # Load up data as dataframe and multiply it
     rawDF = spark.read.parquet('./raw_data.parquet')
     rawDF.show(5, False)
-    for i in range(0, 11):
+    for i in range(0, 10):
         rawDF = rawDF.union(rawDF)
 
+    rawDF.explain(mode="formatted")
     print(f'Incoming data: {rawDF.count()} records')
 
     # First - use broadcast join
